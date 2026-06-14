@@ -28,6 +28,8 @@ class FeatureEngine:
         roughness_path = cache.path(context.aoi, "roughness.tif")
         curvature_path = cache.path(context.aoi, "curvature.tif")
         relief_path = cache.path(context.aoi, "relief.tif")
+        tri_path = cache.path(context.aoi, "tri.tif")
+        tpi_path = cache.path(context.aoi, "tpi.tif")
 
         stack_path = cache.path(
             context.aoi,
@@ -60,6 +62,10 @@ class FeatureEngine:
 
             "relief": relief_path,
 
+            "tri": tri_path,
+
+            "tpi": tpi_path,
+
         }
 
         required = [
@@ -77,6 +83,10 @@ class FeatureEngine:
             relief_path,
 
             stack_path,
+
+            tri_path,
+
+            tpi_path,
 
             normalized_path,
 
@@ -116,6 +126,10 @@ class FeatureEngine:
 
                 "relief",
 
+                "tri",
+
+                "tpi",
+
             ]
 
             return
@@ -153,6 +167,12 @@ class FeatureEngine:
 
             "relief":
                 self.terrain.compute_local_relief(dem),
+
+            "tri":
+                self.terrain.compute_tri(dem),
+
+            "tpi":
+                self.terrain.compute_tpi(dem),
 
         }
 

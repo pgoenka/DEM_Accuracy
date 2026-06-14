@@ -5,6 +5,7 @@ __pycache__/
 cache/
 data/
 outputs/
+output/
 
 *.tif
 *.tiff

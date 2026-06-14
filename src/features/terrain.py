@@ -91,9 +91,6 @@ class TerrainFeatures:
             - minimum_filter(dem, size=3)
         )
     
-    def compute_tri(self, dem):
-        pass
-
     def compute_local_relief(self, dem):
 
         mean = uniform_filter(
@@ -103,5 +100,14 @@ class TerrainFeatures:
 
         return dem - mean
 
+    def compute_tri(self, dem):
+        # We use local standard deviation as a high-performance proxy for TRI.
+        # This highlights highly rugged, oscillating terrain using variance.
+        mean_sq = uniform_filter(dem**2, size=3)
+        sq_mean = uniform_filter(dem, size=3)**2
+        return np.sqrt(np.maximum(mean_sq - sq_mean, 0))
+
     def compute_tpi(self, dem):
-        pass
+        # Topographic Position Index (TPI)
+        # Positive values = ridges/hills. Negative values = valleys/pits.
+        return dem - uniform_filter(dem, size=3)

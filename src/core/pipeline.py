@@ -9,6 +9,11 @@ import rasterio
 from src.features.feature_engine import FeatureEngine
 from src.core.pipeline_registry import PipelineRegistry
 from src.core.stage import PipelineStage
+from src.fusion.fusion_engine import FusionEngine
+from src.preprocessing.coregistration import Coregistrator
+from src.ml.predictor import MLEngine
+from src.export.exporter import Exporter
+from src.preprocessing.hydro_conditioning import HydroConditioner
 
 class Pipeline:
 
@@ -22,6 +27,11 @@ class Pipeline:
         self.terrain = TerrainFeatures()
         self.feature_engine = FeatureEngine()
         self.registry = PipelineRegistry()
+        self.fusion_engine = FusionEngine()
+        self.coregistrator = Coregistrator()
+        self.ml_engine = MLEngine()
+        self.exporter = Exporter()
+        self.hydro_conditioner = HydroConditioner()
         self.registry.add(
             PipelineStage(
                 "Download",
@@ -47,6 +57,20 @@ class Pipeline:
             PipelineStage(
                 "Fusion",
                 self.fuse,
+            )
+        )
+
+        self.registry.add(
+            PipelineStage(
+                "Refinement",
+                self.refine,
+            )
+        )
+
+        self.registry.add(
+            PipelineStage(
+                "Hydrology", 
+                self.condition,
             )
         )
 
@@ -130,6 +154,49 @@ class Pipeline:
             print("Created projected DEM.")
 
         self.context.raw_dems["utm"] = utm_dem
+
+        # ----------------------------
+        # Step 3: Prepare FABDEM
+        # ----------------------------
+        print("\n--- Processing FABDEM ---")
+        fabdem_raw = self.cache.path(self.context.aoi, "fabdem_raw_aoi.tif")
+        fabdem_utm = self.cache.path(self.context.aoi, "fabdem_utm.tif")
+
+        if fabdem_utm.exists():
+            print("Projected FABDEM already exists.")
+        else:
+            if fabdem_raw.exists():
+                print("Reprojecting raw FABDEM...")
+                self.reprojector.reproject(
+                    fabdem_raw,
+                    fabdem_utm,
+                    self.context.aoi.utm_epsg,
+                )
+                print("Created projected FABDEM.")
+            else:
+                import shutil
+                print("Raw FABDEM not found. Using Copernicus as a placeholder to allow pipeline to continue.")
+                shutil.copy2(utm_dem, fabdem_utm)
+                print("Created placeholder FABDEM.")
+
+        # Register the UTM FABDEM in the context
+        self.context.raw_dems["fabdem_utm"] = fabdem_utm
+
+        # ----------------------------
+        # Step 4: DEM Co-registration
+        # ----------------------------
+        print("\n--- Co-registration ---")
+        
+        fabdem_aligned = self.cache.path(self.context.aoi, "fabdem_aligned.tif")
+        
+        self.coregistrator.align_nuth_kaab(
+            ref_path=self.context.raw_dems["utm"],        # Copernicus is the reference
+            tba_path=self.context.raw_dems["fabdem_utm"], # FABDEM is to be aligned
+            out_path=fabdem_aligned
+        )
+        
+        # Register the aligned DEM in the context for the Fusion engine
+        self.context.aligned_dems["fabdem"] = fabdem_aligned
         
     def features(self):
 
@@ -139,7 +206,13 @@ class Pipeline:
         )
 
     def fuse(self):
-        print("Fusion stage")
+        self.fusion_engine.fuse(self.context, self.cache)
+
+    def condition(self):
+        self.hydro_conditioner.condition(self.context, self.cache)
+
+    def refine(self):
+        self.ml_engine.refine_dem(self.context, self.cache)
 
     def export(self):
-        print("Export stage")
+        self.exporter.export(self.context, self.cache)
