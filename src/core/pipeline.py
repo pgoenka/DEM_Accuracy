@@ -16,6 +16,9 @@ from src.export.exporter import Exporter
 from src.preprocessing.hydro_conditioning import HydroConditioner
 from src.preprocessing.satellite_processor import NDVIProcessor, SARProcessor
 from src.preprocessing.urban_processor import UrbanProcessor
+from src.ml.patch_generator import PatchGenerator
+from src.ml.deep_refiner import DeepRefiner
+from src.preprocessing.super_resolution import SuperResUpscaler
 
 class Pipeline:
 
@@ -37,6 +40,9 @@ class Pipeline:
         self.ndvi_processor = NDVIProcessor()
         self.sar_processor = SARProcessor()
         self.urban_processor = UrbanProcessor()
+        self.patch_generator = PatchGenerator()
+        self.deep_refiner = DeepRefiner()
+        self.super_res_upscaler = SuperResUpscaler()
         self.registry.add(
             PipelineStage(
                 "Download",
@@ -69,6 +75,27 @@ class Pipeline:
             PipelineStage(
                 "Refinement",
                 self.refine,
+            )
+        )
+
+        self.registry.add(
+            PipelineStage(
+                "PatchGeneration",
+                self.generate_patches,
+            )
+        )
+
+        self.registry.add(
+            PipelineStage(
+                "DeepRefinement",
+                self.deep_refine,
+            )
+        )
+
+        self.registry.add(
+            PipelineStage(
+                "SuperResolution",
+                self.upscale,
             )
         )
 
@@ -261,6 +288,15 @@ class Pipeline:
 
     def refine(self):
         self.ml_engine.refine_dem(self.context, self.cache)
+
+    def deep_refine(self):
+        self.deep_refiner.train_model(self.context, self.cache)
+
+    def generate_patches(self):
+        self.patch_generator.generate_patches(self.context, self.cache)
+
+    def upscale(self):
+        self.super_res_upscaler.upscale(self.context, self.cache)
 
     def export(self):
         self.exporter.export(self.context, self.cache)

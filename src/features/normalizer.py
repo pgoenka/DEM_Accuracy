@@ -7,6 +7,8 @@ class FeatureNormalizer:
 
         stack = stack.astype(np.float32)
 
+        stack[stack < -500] = np.nan
+
         normalized = np.empty_like(stack)
 
         stats = {}

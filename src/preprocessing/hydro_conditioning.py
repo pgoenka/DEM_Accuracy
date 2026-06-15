@@ -6,7 +6,7 @@ class HydroConditioner:
     def condition(self, context, cache):
         print("\n=== HYDROLOGICAL CONDITIONING ===")
         
-        input_dem = context.outputs.get("final_dem") or context.outputs.get("fused_dem")
+        input_dem = context.outputs.get("super_res_dem") or context.outputs.get("final_dem") or context.outputs.get("fused_dem")
         
         if not input_dem or not input_dem.exists():
             print("[!] No DEM found to condition. Skipping.")

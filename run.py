@@ -21,6 +21,16 @@ def main():
         except Exception as e:
             print(f"Warning: Failed to clear cache: {e}")
 
+    output_dir = Path("output")
+    if output_dir.exists():
+        print(f"Clearing output directory at {output_dir}...")
+        try:
+            shutil.rmtree(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            print("✓ Output directory cleared.")
+        except Exception as e:
+            print(f"Warning: Failed to clear output directory: {e}")
+
     aoi = AreaOfInterest(
         77.0,
         28.0,

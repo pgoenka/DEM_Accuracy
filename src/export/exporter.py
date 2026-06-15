@@ -53,6 +53,9 @@ class Exporter:
         if context.outputs.get("hydro_dem") and context.outputs.get("hydro_dem").exists():
             metadata["processing_steps"].append("Hydrological Conditioning (Fast Depression Breaching)")
 
+        if "feature_importances" in context.outputs:
+            metadata["feature_importances"] = context.outputs["feature_importances"]
+
         out_meta = output_dir / "metadata.json"
         import json
         with open(out_meta, 'w', encoding='utf-8') as f:
