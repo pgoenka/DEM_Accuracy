@@ -11,6 +11,8 @@ class PipelineContext:
 
     lidar: dict = field(default_factory=dict)
 
+    satellite: dict = field(default_factory=dict)
+
     aligned_dems: dict = field(default_factory=dict)
 
     features: dict = field(default_factory=dict)

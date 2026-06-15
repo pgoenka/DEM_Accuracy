@@ -30,6 +30,10 @@ class FeatureEngine:
         relief_path = cache.path(context.aoi, "relief.tif")
         tri_path = cache.path(context.aoi, "tri.tif")
         tpi_path = cache.path(context.aoi, "tpi.tif")
+        ndvi_path = cache.path(context.aoi, "ndvi_utm.tif")
+        sar_vv_path = cache.path(context.aoi, "sar_vv_utm.tif")
+        sar_vh_path = cache.path(context.aoi, "sar_vh_utm.tif")
+        building_mask_path = cache.path(context.aoi, "building_mask.tif")
 
         stack_path = cache.path(
             context.aoi,
@@ -65,6 +69,14 @@ class FeatureEngine:
             "tri": tri_path,
 
             "tpi": tpi_path,
+            
+            "ndvi": ndvi_path,
+
+            "sar_vv": sar_vv_path,
+
+            "sar_vh": sar_vh_path,
+
+            "buildings": building_mask_path,
 
         }
 
@@ -87,6 +99,14 @@ class FeatureEngine:
             tri_path,
 
             tpi_path,
+            
+            ndvi_path,
+
+            sar_vv_path,
+
+            sar_vh_path,
+
+            building_mask_path,
 
             normalized_path,
 
@@ -100,7 +120,7 @@ class FeatureEngine:
 
         if all(path.exists() for path in required):
 
-            print("Terrain features already exist.")
+            print("Features already exist.")
 
             context.features.update(feature_paths)
 
@@ -129,13 +149,21 @@ class FeatureEngine:
                 "tri",
 
                 "tpi",
+                
+                "ndvi",
+
+                "sar_vv",
+
+                "sar_vh",
+
+                "buildings",
 
             ]
 
             return
 
         # ------------------------------------------------------------------
-        # Read DEM
+        # Read Data
         # ------------------------------------------------------------------
 
         with rasterio.open(dem_path) as src:
@@ -143,6 +171,18 @@ class FeatureEngine:
             dem = src.read(1)
 
             profile = src.profile
+            
+        def read_layer(path, label):
+            if not path.exists():
+                print(f"Warning: {label} path not found. Using zeros.")
+                return np.zeros_like(dem, dtype=np.float32)
+            with rasterio.open(path) as src:
+                return src.read(1).astype(np.float32)
+
+        ndvi = read_layer(ndvi_path, "NDVI")
+        sar_vv = read_layer(sar_vv_path, "SAR VV")
+        sar_vh = read_layer(sar_vh_path, "SAR VH")
+        buildings = read_layer(building_mask_path, "Building Mask")
 
         # ------------------------------------------------------------------
         # Generate terrain features
@@ -211,6 +251,9 @@ class FeatureEngine:
                 generated[name].astype(np.float32)
 
             )
+            
+        # Add optical, radar, and urban channels
+        stack_layers.extend([ndvi, sar_vv, sar_vh, buildings])
 
         stack = np.stack(
 
@@ -234,7 +277,15 @@ class FeatureEngine:
 
             "dem",
 
-            *generated.keys()
+            *generated.keys(),
+            
+            "ndvi",
+
+            "sar_vv",
+
+            "sar_vh",
+
+            "buildings"
 
         ]
 
@@ -288,11 +339,16 @@ class FeatureEngine:
         # Summary
         # ------------------------------------------------------------------
 
-        print("\nCreated terrain features:\n")
+        print("\nCreated features:\n")
 
         for name in generated:
 
             print(f"  ✓ {name}")
+            
+        print("  ✓ ndvi")
+        print("  ✓ sar_vv")
+        print("  ✓ sar_vh")
+        print("  ✓ buildings")
 
         print("\nCreated feature artifacts:\n")
 

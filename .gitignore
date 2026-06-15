@@ -17,3 +17,6 @@ output/
 
 .vscode/
 .idea/
+
+.env
+.netrc

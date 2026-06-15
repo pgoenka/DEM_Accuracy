@@ -14,6 +14,8 @@ from src.preprocessing.coregistration import Coregistrator
 from src.ml.predictor import MLEngine
 from src.export.exporter import Exporter
 from src.preprocessing.hydro_conditioning import HydroConditioner
+from src.preprocessing.satellite_processor import NDVIProcessor, SARProcessor
+from src.preprocessing.urban_processor import UrbanProcessor
 
 class Pipeline:
 
@@ -32,6 +34,9 @@ class Pipeline:
         self.ml_engine = MLEngine()
         self.exporter = Exporter()
         self.hydro_conditioner = HydroConditioner()
+        self.ndvi_processor = NDVIProcessor()
+        self.sar_processor = SARProcessor()
+        self.urban_processor = UrbanProcessor()
         self.registry.add(
             PipelineStage(
                 "Download",
@@ -91,9 +96,14 @@ class Pipeline:
 
         print("\n=== DOWNLOAD ===")
 
-        self.download_manager.download_all(
+        results = self.download_manager.download_all(
             self.context.aoi
         )
+
+        # Store files in context for Phase 2
+        self.context.satellite["sentinel2"] = results.get("sentinel2", [])
+        self.context.satellite["sentinel1"] = results.get("sentinel1", [])
+        self.context.satellite["buildings"] = results.get("buildings", [])
 
     def preprocess(self):
         print("\n=== PREPROCESS ===")
@@ -197,6 +207,44 @@ class Pipeline:
         
         # Register the aligned DEM in the context for the Fusion engine
         self.context.aligned_dems["fabdem"] = fabdem_aligned
+
+        # ----------------------------
+        # Step 5: Satellite Processing (NDVI & SAR)
+        # ----------------------------
+        print("\n--- Satellite Preprocessing (Phase 2) ---")
+        
+        # NDVI
+        try:
+            self.ndvi_processor.compute_and_align(
+                self.context,
+                self.cache,
+                target_dem_path=self.context.raw_dems["utm"]
+            )
+        except Exception as e:
+            print(f"Warning: NDVI processing failed: {e}")
+
+        # SAR
+        try:
+            self.sar_processor.align_sar(
+                self.context,
+                self.cache,
+                target_dem_path=self.context.raw_dems["utm"]
+            )
+        except Exception as e:
+            print(f"Warning: SAR processing failed: {e}")
+
+        # ----------------------------
+        # Step 6: Urban Processing (Building Footprints)
+        # ----------------------------
+        print("\n--- Urban Preprocessing (Phase 2) ---")
+        try:
+            self.urban_processor.process_buildings(
+                self.context,
+                self.cache,
+                target_dem_path=self.context.raw_dems["utm"]
+            )
+        except Exception as e:
+            print(f"Warning: Urban building processing failed: {e}")
         
     def features(self):
 

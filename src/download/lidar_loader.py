@@ -3,6 +3,8 @@ import h5py
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
 class LidarLoader:
     def fetch(self, aoi, out_file):
@@ -12,11 +14,20 @@ class LidarLoader:
             return out_path
 
         print("\n--- NASA LiDAR (ICESat-2) ---")
+        
+        # Load environment variables from .env file
+        load_dotenv()
+        
         print("Authenticating with NASA Earthdata...")
         try:
-            # This will prompt for credentials in the terminal on the first run
-            # and automatically save them to ~/.netrc for future runs.
-            earthaccess.login(strategy="interactive") 
+            if os.getenv("EARTHDATA_USERNAME") and os.getenv("EARTHDATA_PASSWORD"):
+                print("Using credentials from environment variables.")
+                earthaccess.login(strategy="environment")
+            else:
+                # This will prompt for credentials in the terminal on the first run
+                # and automatically save them to ~/.netrc for future runs.
+                print("No credentials found in .env file. Falling back to interactive login.")
+                earthaccess.login(strategy="interactive") 
         except Exception as e:
             print(f"[!] Earthdata Login Failed: {e}")
             print("[!] Please create a free account at https://urs.earthdata.nasa.gov/")
