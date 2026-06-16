@@ -1,3 +1,9 @@
+import sys
+import io
+# Force UTF-8 output on Windows to avoid crashes from Unicode characters (e.g. ✓)
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 import shutil
 from pathlib import Path
 from src.core.aoi import AreaOfInterest
@@ -32,11 +38,12 @@ def main():
             print(f"Warning: Failed to clear output directory: {e}")
 
     aoi = AreaOfInterest(
-        77.0,
-        28.0,
-        77.1,
+        85.83,
+        27.65,
+        86.55,
         28.1,
     )
+
 
     pipeline = Pipeline(aoi)
     

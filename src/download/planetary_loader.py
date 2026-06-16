@@ -53,8 +53,8 @@ class PlanetaryLoader:
         )
         return list(search.items())
 
-    def _download_url(self, url, filename):
-        """Helper to download a file with a progress bar."""
+    def _download_url(self, url, filename, max_retries=3):
+        """Helper to download a file with a progress bar and retry logic."""
         if filename.exists():
             print(f"Already exists: {filename.name}")
             return True
@@ -64,25 +64,50 @@ class PlanetaryLoader:
             # We handle this via specialized loaders like geopandas for buildings
             return False
 
-        print(f"Downloading {filename.name}")
-        r = requests.get(url, stream=True)
-        r.raise_for_status()
+        import time
+        for attempt in range(1, max_retries + 1):
+            try:
+                print(f"Downloading {filename.name}" + (f" (attempt {attempt}/{max_retries})" if attempt > 1 else ""))
+                r = requests.get(url, stream=True, timeout=300)
+                r.raise_for_status()
 
-        total_size = int(r.headers.get("content-length", 0))
-        chunk_size = 1024 * 1024  # 1 MB
+                total_size = int(r.headers.get("content-length", 0))
+                chunk_size = 1024 * 1024  # 1 MB
 
-        with open(filename, "wb") as f, tqdm(
-            desc=filename.name,
-            total=total_size,
-            unit="B",
-            unit_scale=True,
-            unit_divisor=1024,
-        ) as progress:
-            for chunk in r.iter_content(chunk_size=chunk_size):
-                if chunk:
-                    f.write(chunk)
-                    progress.update(len(chunk))
-        return True
+                with open(filename, "wb") as f, tqdm(
+                    desc=filename.name,
+                    total=total_size,
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                ) as progress:
+                    for chunk in r.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            f.write(chunk)
+                            progress.update(len(chunk))
+                return True
+
+            except requests.exceptions.HTTPError as e:
+                print(f"HTTP error on attempt {attempt}/{max_retries}: {e}")
+                # Clean up partial download
+                if filename.exists():
+                    filename.unlink()
+                if attempt < max_retries:
+                    wait = 5 * attempt
+                    print(f"Retrying in {wait}s...")
+                    time.sleep(wait)
+                else:
+                    raise
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+                print(f"Connection error on attempt {attempt}/{max_retries}: {e}")
+                if filename.exists():
+                    filename.unlink()
+                if attempt < max_retries:
+                    wait = 5 * attempt
+                    print(f"Retrying in {wait}s...")
+                    time.sleep(wait)
+                else:
+                    raise
 
     def download_cop_dem(self, aoi, output_dir):
 
@@ -94,6 +119,9 @@ class PlanetaryLoader:
         downloaded = []
 
         for item in items:
+            # Re-sign the item to get a fresh SAS token before each download.
+            planetary_computer.sign_inplace(item)
+
             asset = item.assets["data"]
             url = asset.href
             filename = output_dir / f"{item.id}.tif"
@@ -124,7 +152,11 @@ class PlanetaryLoader:
             if band not in item.assets:
                 print(f"Warning: Band {band} not found in item {item.id}")
                 continue
-            
+
+            # Re-sign the item before each band download to get a fresh SAS token.
+            # Previous tokens may have expired during long downloads.
+            planetary_computer.sign_inplace(item)
+
             asset = item.assets[band]
             url = asset.href
             filename = output_dir / f"{item.id}_{band}.tif"
@@ -155,6 +187,9 @@ class PlanetaryLoader:
             if band not in item.assets:
                 print(f"Warning: Band {band} not found in item {item.id}")
                 continue
+
+            # Re-sign the item before each band download to get a fresh SAS token.
+            planetary_computer.sign_inplace(item)
 
             asset = item.assets[band]
             url = asset.href
